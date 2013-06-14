@@ -7,7 +7,7 @@
  *
  * @package Exclude Pages from Navigation
  * @subpackage Uninstall
- * @since 2.0
+ * @since 2.0.0
  *
  * @author Juliette Reinders Folmer
  */
@@ -17,3 +17,4 @@ if( !defined( 'ABSPATH' ) && !defined( 'WP_UNINSTALL_PLUGIN' ) )
     exit();
  
 delete_option( 'ep_exclude_pages' );
+delete_option( 'ep_exclude_pages_version' );

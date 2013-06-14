@@ -3,11 +3,13 @@
 Plugin Name: Exclude Pages from Navigation
 Plugin URI: http://wordpress.org/extend/plugins/exclude-pages/
 Description: Provides a checkbox on the editing page which you can check to exclude pages from the primary navigation. IMPORTANT NOTE: This will remove the pages from any "consumer" side page listings, which may not be limited to your page navigation listings.
-Version: 2.0beta
+Version: 2.0.beta.2
 Author: Simon Wheatley
 Author URI: http://simonwheatley.co.uk/wordpress/
 Contributor: Juliette Reinders Folmer
 Contributor URI: http://adviesenzo.nl/
+Contributor: Earnjam
+Contributor URI:
 Text Domain: exclude-pages
 Domain Path: /locale/
 
@@ -28,12 +30,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 */
 
+/**
+ * @todo: rework to class
+ * @todo: change ctrl-check to proper nonce-check
+ */
+
+// @todo Note: until 2.0.0 is released, the version number also needs to be changed in the upgrade routine
+define('EP_VERSION', '2.0.beta.2');
 
 // Full filesystem path to this dir
 define('EP_PLUGIN_DIR', dirname(__FILE__));
 
 // Option name for exclusion data
 define('EP_OPTION_NAME', 'ep_exclude_pages');
+// Option name for plugin version
+define('EP_VERSION_OPTION_NAME', 'ep_exclude_pages_version');
+
 // Separator for the string of IDs stored in the option value
 define('EP_OPTION_SEP', ',');
 // The textdomain for the WP i18n gear
@@ -169,12 +181,21 @@ function ep_get_excluded_ids() {
 	return explode( EP_OPTION_SEP, $exclude_ids_str );
 }
 
-// This function gets all the exclusions out of the options
-// table, updates them, and resaves them in the options table.
-// We're avoiding making this a postmeta (custom field) because we
-// don't want to have to retrieve meta for every page in order to
-// determine if it's to be excluded. Storing all the exclusions in
-// one row seems more sensible.
+/**
+ * This function gets all the exclusions out of the options
+ * table, updates them, and resaves them in the options table.
+ * We're avoiding making this a postmeta (custom field) because we
+ * don't want to have to retrieve meta for every page in order to
+ * determine if it's to be excluded. Storing all the exclusions in
+ * one row seems more sensible.
+ *
+ * @author Simon Wheatley,
+ * @version 2.0.0
+ *
+ * @param int $post_ID The ID of the WP page to exclude
+ * @param object $post The post object
+ * @return void
+ */
 function ep_update_exclusions( $post_ID, $post ) {
 
 	// Bail on auto-save
@@ -327,12 +348,19 @@ function ep_admin_js() {
 END;
 }
 
+/**
+ * Hooks the WordPress admin_footer action to inject the quick edit script
+ *
+ * @return void
+ * @author Juliette Reinders Folmer
+ **/
 function ep_admin_quickedit_js() {
-    $slug = 'page';
-    # load only when editing a page
-    if( ( isset( $_GET['page'] ) && $_GET['page'] == $slug )
-        || ( isset( $_GET['post_type'] ) && $_GET['post_type'] == $slug ) ) {
-        echo '<script type="text/javascript" src="' . plugins_url( 'admin_quickedit.js', __FILE__ ) . '"></script>';
+	$types = get_post_types( array ( 'hierarchical' => true ), 'names');
+	$suffix = ( ( defined( 'SCRIPT_DEBUG' ) && SCRIPT_DEBUG === true ) ? '' : '.min' );
+    # load only when editing a hierarchical post type
+    if( ( isset( $_GET['page'] ) && in_array( $_GET['page'], $types ) )
+        || ( isset( $_GET['post_type'] ) && in_array( $_GET['post_type'], $types ) ) ) {
+        echo '<script type="text/javascript" src="' . plugins_url( 'admin_quickedit'.$suffix.'.js', __FILE__ ) . '"></script>';
     }
 }
 
@@ -360,11 +388,12 @@ function ep_init() {
 	// the admin side must use another function to get the pages. So we're safe to
 	// remove these pages every time.)
 	add_filter('get_pages','ep_exclude_pages');
+	// Load up the translation gear
 }
 
 function ep_admin_init() {
 	// Add panels into the editing sidebar(s)
-	global $wp_version;
+//	global $wp_version;
 	// Add the meta box to every hierarchical post type.
 	$types = get_post_types( array ( 'hierarchical' => true ), 'names');
 	foreach ($types as $type) {
@@ -396,8 +425,63 @@ function ep_admin_init() {
 	// add_filter('hec_show_dbx','ep_hec_show_dbx');
 }
 
-// HOOK IT UP TO WORDPRESS
+/**
+ * Upgrade the plugin options if needed
+ *
+ * @author Juliette Reinders Folmer
+ * @author earnjam
+ * @since 2.0.0
+ */
+function ep_upgrade_options() {
+	
+	// New installation of the plugin, option upgrade not needed, just add version number
+	if( get_option( EP_OPTION_NAME ) === false ) {
+		update_option( EP_VERSION_OPTION_NAME, EP_VERSION );
+		return;
+	}
 
+
+	$excluded_ids = ep_get_excluded_ids();
+
+	/**
+	 * Upgrades for any version of this plugin lower than x.x
+	 * N.B.: Version nr has to be hard coded to be future-proof, i.e. facilitate
+	 * upgrade routines for various versions
+	 */
+	/* Settings upgrade for version 2.0.0 */
+	if( get_option( EP_VERSION_OPTION_NAME ) === false || version_compare( get_option( EP_VERSION_OPTION_NAME ), '2.0.beta.2', '<' ) ) {
+
+		/* Remove revision post ids from the array*/
+		// @todo
+		// For each post id check whether this is the main id or a revision id
+		// If revision id, verify that the id of the original page is included in the exclude array
+			// If needed, add the id of the real page
+			// Remove revision id
+
+	}
+
+	/* De-dupe the array, just in case and implode to string */
+	$excluded_ids = array_unique( $excluded_ids );
+	$excluded_ids_str = implode( EP_OPTION_SEP, $excluded_ids );
+
+	/* Update the options */
+	update_option( EP_OPTION_NAME, $excluded_ids_str );
+	update_option( EP_VERSION_OPTION_NAME, EP_VERSION );
+
+	return;
+}
+
+
+// OPTION UPGRADING
+/* Check if we have any activation or upgrade actions to do */
+if( get_option( EP_VERSION_OPTION_NAME ) === false || version_compare( EP_VERSION, get_option( EP_VERSION_OPTION_NAME ), '>' ) ) {
+	add_action( 'init', 'ep_upgrade_options', 8 );
+}
+// Make sure that an upgrade check is done on (re-)activation as well.
+register_activation_hook( __FILE__, 'ep_upgrade_options' );
+
+
+// HOOK IT UP TO WORDPRESS
 add_action( 'init', 'ep_init' );
 add_action( 'admin_init', 'ep_admin_init' );
 
@@ -408,7 +492,7 @@ add_action( 'admin_init', 'ep_admin_init' );
  * Add an 'In Menu ?' column to the pages overview
  *
  * @author Juliette Reinders Folmer
- * @since 2.0
+ * @since 2.0.0
  */
 function ep_custom_pages_columns( $columns ) {
 
@@ -425,7 +509,7 @@ function ep_custom_pages_columns( $columns ) {
  * Fill the 'In Menu ?' column for each row with the exclude status
  *
  * @author Juliette Reinders Folmer
- * @since 2.0
+ * @since 2.0.0
  */
 function ep_fill_custom_column( $column, $post_id ) {
 	static $excluded_ids;
@@ -464,7 +548,6 @@ function ep_fill_custom_column( $column, $post_id ) {
 
 			break;
 	}
-
 }
 
 
@@ -472,7 +555,7 @@ function ep_fill_custom_column( $column, $post_id ) {
  * Print out the quick edit tickbox
  *
  * @author Juliette Reinders Folmer
- * @since 2.0
+ * @since 2.0.0
  */
 function ep_display_custom_quickedit_inmenu( $column_name, $post_type ) {
 	echo '
