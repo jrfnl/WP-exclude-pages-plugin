@@ -202,15 +202,9 @@ function ep_update_exclusions( $post_ID ) {
 		if ( $index !== false ) unset( $excluded_ids[$index] );
 	}
 	$excluded_ids_str = implode( EP_OPTION_SEP, $excluded_ids );
-	ep_set_option( EP_OPTION_NAME, $excluded_ids_str );
-}
-
-// Take an option, delete it if it exists, then add it.
-function ep_set_option( $name, $value ) {
-	// Delete option	
-	delete_option($name);
-	// Insert option
-	add_option( $name, $value );
+	// Use built in WP function for updating/adding options
+	// If option exists, it will update it, if not, it will add it
+	update_option( EP_OPTION_NAME, $excluded_ids_str );
 }
 
 /**
