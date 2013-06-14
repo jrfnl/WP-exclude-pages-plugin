@@ -4,7 +4,6 @@
  * @since 2.0.0
  */
 function quickEditInMenu() {
-    var $ = jQuery;
     var _edit = inlineEditPost.edit;
     inlineEditPost.edit = function(id) {
         var args = [].slice.call(arguments);
@@ -16,15 +15,15 @@ function quickEditInMenu() {
         if (this.type == 'page') {
             var
             // editRow is the quick-edit row, containing the inputs that need to be updated
-            editRow = $('#edit-' + id),
+            editRow = jQuery('#edit-' + id),
             // postRow is the row shown when a page isn't being edited, which also holds the existing values.
-            postRow = $('#post-'+id),
+            postRow = jQuery('#post-'+id),
 
             // get the existing value
-            inmenu = !! $('.column-inmenu>input', postRow).attr('checked');
+            inmenu = !! jQuery('.column-inmenu>input', postRow).attr('checked');
 
             // set the value in the quick-editor
-            $(':input[name="ep_this_page_included"]', editRow).attr('checked', inmenu);
+            jQuery(':input[name="ep_this_page_included"]', editRow).attr('checked', inmenu);
         }
     };
 }
