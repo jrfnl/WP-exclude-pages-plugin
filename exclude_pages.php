@@ -51,14 +51,22 @@ define('EP_OPTION_SEP', ',');
 // The textdomain for the WP i18n gear
 define( 'EP_TD', 'exclude-pages' );
 
-// Take the pages array, and return the pages array without the excluded pages
-// Doesn't do this when in the admin area
+
+/**
+ * Take the pages array, and return the pages array without the excluded pages
+ * Does NOT do this when in the admin area
+ *
+ * @author Simon Wheatley
+ *
+ * @param array $pages
+ * @return array
+ */
 function ep_exclude_pages( $pages ) {
 	// If the URL includes "wp-admin", just return the unaltered list
 	// This constant, WP_ADMIN, only came into WP on 2007-12-19 17:56:16 rev 6412, i.e. not something we can rely upon unfortunately.
 	// May as well check it though.
 	// Also check the URL... let's hope they haven't got a page called wp-admin (probably not)
-	// SWTODO: Actually, you can create a page with an address of wp-admin (which is then inaccessible), I consider this a bug in WordPress (which I may file a report for, and patch, another time).
+	// @todo SWTODO: Actually, you can create a page with an address of wp-admin (which is then inaccessible), I consider this a bug in WordPress (which I may file a report for, and patch, another time).
 	$bail_out = ( ( defined( 'WP_ADMIN' ) && WP_ADMIN == true ) || ( strpos( $_SERVER[ 'PHP_SELF' ], 'wp-admin' ) !== false ) );
 	$bail_out = apply_filters( 'ep_admin_bail_out', $bail_out );
 	if ( $bail_out ) return $pages;
@@ -70,7 +78,7 @@ function ep_exclude_pages( $pages ) {
 		$page = & $pages[$i];
 		// If one of the ancestor pages is excluded, add it to our exclude array
 		if ( ep_ancestor_excluded( $page, $excluded_ids, $pages ) ) {
-			// Can't actually delete the pages at the moment, 
+			// Can't actually delete the pages at the moment,
 			// it'll screw with our recursive search.
 			// For the moment, just tag the ID onto our excluded IDs
 			$excluded_ids[] = $page->ID;
@@ -79,7 +87,7 @@ function ep_exclude_pages( $pages ) {
 
 	// Ensure the array only has unique values
 	$delete_ids = array_unique( $excluded_ids );
-	
+
 	// Loop though the $pages array and actually unset/delete stuff
 	for ( $i=0; $i<$length; $i++ ) {
 		$page = & $pages[$i];
@@ -90,8 +98,8 @@ function ep_exclude_pages( $pages ) {
 		}
 	}
 
-	// Reindex the array, for neatness
-	// SWFIXME: Is reindexing the array going to create a memory optimisation problem for large arrays of WP post/page objects?
+	// Re-index the array, for neatness
+	// @todo SWFIXME: Is re-indexing the array going to create a memory optimisation problem for large arrays of WP post/page objects?
 	if ( ! is_array( $pages ) ) $pages = (array) $pages;
 	$pages = array_values( $pages );
 
@@ -99,23 +107,29 @@ function ep_exclude_pages( $pages ) {
 }
 
 /**
- * Recurse down an ancestor chain, checking if one is excluded
+ * Recur down an ancestor chain, checking if one is excluded
  *
- * @param  
- * @return boolean|int The ID of the "nearest" excluded ancestor, otherwise false
  * @author Simon Wheatley
- **/
+ *
+ * @param int	$page
+ * @param array $excluded_ids
+ * @param array $pages
+ * @return boolean|int The ID of the "nearest" excluded ancestor, otherwise false
+ */
 function ep_ancestor_excluded( $page, $excluded_ids, $pages ) {
 	$parent = & ep_get_page( $page->post_parent, $pages );
 	// Is there a parent?
 	if ( ! $parent )
 		return false;
+
 	// Is it excluded?
 	if ( in_array( $parent->ID, $excluded_ids ) )
 		return (int) $parent->ID;
+
 	// Is it the homepage?
 	if ( $parent->ID == 0 )
 		return false;
+
 	// Otherwise we have another ancestor to check
 	return ep_ancestor_excluded( $parent, $excluded_ids, $pages );
 }
@@ -123,11 +137,12 @@ function ep_ancestor_excluded( $page, $excluded_ids, $pages ) {
 /**
  * {no description}
  *
- * @param int $page_id The ID of the WP page to search for
+ * @author Simon Wheatley
+ *
+ * @param int	$page_id The ID of the WP page to search for
  * @param array $pages An array of WP page objects
  * @return boolean|object the page from the $pages array which corresponds to the $page_id
- * @author Simon Wheatley
- **/
+ */
 function ep_get_page( $page_id, $pages ) {
 	// PHP 5 would be much nicer here, we could use foreach by reference, ah well.
 	$length = count($pages);
@@ -139,11 +154,17 @@ function ep_get_page( $page_id, $pages ) {
 	return false;
 }
 
-// Is this page we're editing (defined by global $post_ID var) 
-// currently NOT excluded (i.e. included),
-// returns true if NOT excluded (i.e. included)
-// returns false is it IS excluded.
-// (Tricky this upside down flag business.)
+
+/**
+ * Is this page we're editing (defined by global $post_ID var) currently
+ * NOT excluded (i.e. included), returns true if NOT excluded (i.e. included)
+ * returns false is it IS excluded.
+ * (Tricky this upside down flag business.)
+ *
+ * @author Simon Wheatley
+ *
+ * @return bool
+ */
 function ep_this_page_included() {
 	global $post_ID;
 	// New post? Must be included then.
@@ -157,9 +178,14 @@ function ep_this_page_included() {
 	// fn1. (of the neutron flow, ahem)
 }
 
-// Check the ancestors for the page we're editing (defined by 
-// global $post_ID var), return the ID if the nearest one which
-// is excluded (if any);
+/**
+ * Check the ancestors for the page we're editing (defined by global $post_ID var),
+ * return the ID of the nearest one which is excluded (if any);
+ *
+ * @author Simon Wheatley
+ *
+ * @return bool|int
+ */
 function ep_nearest_excluded_ancestor() {
 	global $post_ID, $wpdb;
 	// New post? No problem.
@@ -173,6 +199,13 @@ function ep_nearest_excluded_ancestor() {
 	return ep_ancestor_excluded( $parent, $excluded_ids, $pages );
 }
 
+/**
+ * Retrieve array of excluded ids
+ *
+ * @author Simon Wheatley
+ *
+ * @return array
+ */
 function ep_get_excluded_ids() {
 	$exclude_ids_str = get_option( EP_OPTION_NAME );
 	// No excluded IDs? Return an empty array
@@ -182,14 +215,14 @@ function ep_get_excluded_ids() {
 }
 
 /**
- * This function gets all the exclusions out of the options
- * table, updates them, and resaves them in the options table.
+ * This function gets all the exclusions out of the options table,
+ * updates them, and re-saves them in the options table.
  * We're avoiding making this a postmeta (custom field) because we
  * don't want to have to retrieve meta for every page in order to
  * determine if it's to be excluded. Storing all the exclusions in
  * one row seems more sensible.
  *
- * @author Simon Wheatley,
+ * @author Simon Wheatley, earnjam
  * @version 2.0.0
  *
  * @param int $post_ID The ID of the WP page to exclude
@@ -200,21 +233,21 @@ function ep_update_exclusions( $post_ID, $post ) {
 
 	// Bail on auto-save
 	if( defined( 'DOING_AUTOSAVE' ) && DOING_AUTOSAVE ) return;
-    // If our current user can't edit this post, bail  
-    if( !current_user_can( 'edit_post' ) ) return; 
+	// If our current user can't edit this post, bail
+	if( !current_user_can( 'edit_post' ) ) return;
 	// Don't save the IDs of revisions. This keeps the excluded pages array smaller.
 	if ($post->post_type == 'revision') return;
 
 	// Bang (!) to reverse the polarity of the boolean, turning include into exclude
 	$exclude_this_page = ! (bool) @ $_POST['ep_this_page_included'];
-	// SWTODO: Also check for a hidden var, which confirms that this checkbox was present
+	// @todo SWTODO: Also check for a hidden var, which confirms that this checkbox was present
 	// If hidden var not present, then default to including the page in the nav (i.e. bomb out here rather
 	// than add the page ID to the list of IDs to exclude)
 	$ctrl_present = (bool) @ $_POST['ep_ctrl_present'];
-	
+
 	if ( ! $ctrl_present )
 		return;
-	
+
 	$excluded_ids = ep_get_excluded_ids();
 	// If we need to EXCLUDE the page from the navigation...
 	if ( $exclude_this_page ) {
@@ -239,27 +272,28 @@ function ep_update_exclusions( $post_ID, $post ) {
 /**
  * Callback function for the metabox on the page edit screen.
  *
- * @return void
  * @author Simon Wheatley
- **/
+ *
+ * @return void
+ */
 function ep_admin_sidebar_wp25() {
 	$nearest_excluded_ancestor = ep_nearest_excluded_ancestor();
-	echo '	<div id="excludepagediv" class="new-admin-wp25">';
-	echo '		<div class="outer"><div class="inner">';
-	echo '		<p><label for="ep_this_page_included" class="selectit">';
-	echo '		<input ';
-	echo '			type="checkbox" ';
-	echo '			name="ep_this_page_included" ';
-	echo '			id="ep_this_page_included" ';
-	if ( ep_this_page_included() ) 
-		echo 'checked="checked"';
-	echo ' />';
-	echo '			'.__( 'Include this page in lists of pages', EP_TD ).'</label>';
-	echo '		<input type="hidden" name="ep_ctrl_present" value="1" /></p>';
+	echo '	<div id="excludepagediv" class="new-admin-wp25">
+		<div class="outer"><div class="inner">
+		<p><label for="ep_this_page_included" class="selectit">
+			<input
+				type="checkbox"
+				name="ep_this_page_included"
+				id="ep_this_page_included" ' .
+				( ep_this_page_included() ? 'checked="checked"' : '' ) . '
+			 />' .
+			__( 'Include this page in lists of pages', EP_TD ) . '</label>
+			<input type="hidden" name="ep_ctrl_present" value="1" />
+		</p>';
 	if ( $nearest_excluded_ancestor !== false ) {
-		echo '<p class="ep_exclude_alert"><em>';
-		printf( __( 'N.B. An ancestor of this page is excluded, so this page is too (<a href="%1$s" title="%2$s">edit ancestor</a>).', EP_TD), "post.php?action=edit&amp;post=$nearest_excluded_ancestor", __( 'edit the excluded ancestor', EP_TD ) );
-		echo '</em></p>';
+		echo '<p class="ep_exclude_alert"><em>' .
+		sprintf( __( 'N.B. An ancestor of this page is excluded, so this page is too (<a href="%1$s" title="%2$s">edit ancestor</a>).', EP_TD), "post.php?action=edit&amp;post=$nearest_excluded_ancestor", __( 'edit the excluded ancestor', EP_TD ) ) .
+		'</em></p>';
 	}
 	// If there are custom menus (WP 3.0+) then we need to clear up some
 	// potential confusion here.
@@ -268,46 +302,54 @@ function ep_admin_sidebar_wp25() {
 		if ( current_user_can( 'edit_theme_options' ) )
 			printf( __( 'N.B. This page can still appear in explicitly created <a href="%1$s">menus</a> (<a id="ep_toggle_more" href="#ep_explain_more">explain more</a>)', EP_TD),
 				"nav-menus.php" );
+
 		else
 			_e( 'N.B. This page can still appear in explicitly created menus (<a id="ep_toggle_more" href="#ep_explain_more">explain more</a>)', EP_TD);
+
 		echo '</em></p>';
 		echo '<div id="ep_explain_more"><p>';
 		if ( current_user_can( 'edit_theme_options' ) )
 			printf( __( 'WordPress provides a simple function for you to maintain your site <a href="%1$s">menus</a>. If you create a menu which includes this page, the checkbox above will not have any effect on the visibility of that menu item.', EP_TD),
 				"nav-menus.php" );
+
 		else
 			_e( 'WordPress provides a simple function for you to maintain the site menus, which your site administrator is using. If a menu includes this page, the checkbox above will not have any effect on the visibility of that menu item.', EP_TD);
-		echo '</p><p>';
-		echo _e( 'If you think you no longer need the Exclude Pages plugin you should talk to your WordPress administrator about disabling it.', EP_TD );
-		echo '</p></div>';
+
+		echo '</p><p>' .
+		__( 'If you think you no longer need the Exclude Pages plugin you should talk to your WordPress administrator about disabling it.', EP_TD ) .
+		'</p></div>';
 	}
-	echo '		</div><!-- .inner --></div><!-- .outer -->';
-	echo '	</div><!-- #excludepagediv -->';
+	echo '		</div><!-- .inner --></div><!-- .outer -->
+	</div><!-- #excludepagediv -->';
 }
 
 /**
  * A conditional function to determine whether there are any menus
  * defined in this WordPress installation.
  *
- * @return bool Indicates the presence or absence of menus
  * @author Simon Wheatley
- **/
+ *
+ * @return bool Indicates the presence or absence of menus
+ */
 function ep_has_menu() {
 	if ( ! function_exists( 'wp_get_nav_menus' ) )
 		return false;
+
 	$menus = wp_get_nav_menus();
 	foreach ( $menus as $menu_maybe ) {
 		if ( $menu_items = wp_get_nav_menu_items($menu_maybe->term_id) )
 			return true;
 	}
+	return false;
 }
 
 /**
  * Hooks the WordPress admin_head action to inject some CSS.
  *
- * @return void
  * @author Simon Wheatley
- **/
+ *
+ * @return void
+ */
 function ep_admin_css() {
 	echo <<<END
 <style type="text/css" media="screen">
@@ -318,7 +360,7 @@ function ep_admin_css() {
 	#ep_admin_meta_box .inner label { background-color: none; }
 	.new-admin-wp25 .exclude_alert { padding-top: 5px; }
 	.new-admin-wp25 .exclude_alert em { font-style: normal; }
-	
+
 	.ep_parent_excluded { opacity:0.3; filter:alpha(opacity=30); /* For IE8 and earlier */ }
 	.fixed .column-inmenu { width: 4em; }
 	#wpbody-content .quick-edit-row-page fieldset.inline-edit-inmenu { border-right: 1px solid #DFDFDF; }
@@ -331,9 +373,10 @@ END;
 /**
  * Hooks the WordPress admin_head action to inject some JS.
  *
- * @return void
  * @author Simon Wheatley
- **/
+ *
+ * @return void
+ */
 function ep_admin_js() {
 	echo <<<END
 <script type="text/javascript">
@@ -351,27 +394,35 @@ END;
 /**
  * Hooks the WordPress admin_footer action to inject the quick edit script
  *
- * @return void
  * @author Juliette Reinders Folmer
- **/
+ *
+ * @return void
+ */
 function ep_admin_quickedit_js() {
 	$types = get_post_types( array ( 'hierarchical' => true ), 'names');
 	$suffix = ( ( defined( 'SCRIPT_DEBUG' ) && SCRIPT_DEBUG === true ) ? '' : '.min' );
-    # load only when editing a hierarchical post type
-    if( ( isset( $_GET['page'] ) && in_array( $_GET['page'], $types ) )
-        || ( isset( $_GET['post_type'] ) && in_array( $_GET['post_type'], $types ) ) ) {
-        echo '<script type="text/javascript" src="' . plugins_url( 'admin_quickedit'.$suffix.'.js', __FILE__ ) . '"></script>';
-    }
+	# load only when editing a hierarchical post type
+	if( ( isset( $_GET['page'] ) && in_array( $_GET['page'], $types ) )
+		|| ( isset( $_GET['post_type'] ) && in_array( $_GET['post_type'], $types ) ) ) {
+		echo '<script type="text/javascript" src="' . plugins_url( 'admin_quickedit'.$suffix.'.js', __FILE__ ) . '"></script>';
+	}
 }
 
-// Add our ctrl to the list of controls which AREN'T hidden
+
+/**
+ * Add our ctrl to the list of controls which are NOT hidden
+ *
+ * @author Simon Wheatley
+ *
+ * @param $to_show
+ * @return mixed
+ */
 function ep_hec_show_dbx( $to_show ) {
 	array_push( $to_show, 'excludepagediv' );
 	return $to_show;
 }
 
 // PAUSE & RESUME FUNCTIONS
-
 function pause_exclude_pages() {
 	remove_filter('get_pages','ep_exclude_pages');
 }
@@ -382,6 +433,11 @@ function resume_exclude_pages() {
 
 // INIT FUNCTIONS
 
+/**
+ * Add the main filter
+ *
+ * @author Simon Wheatley
+ */
 function ep_init() {
 	// Call this function on the get_pages filter
 	// (get_pages filter appears to only be called on the "consumer" side of WP,
@@ -391,6 +447,12 @@ function ep_init() {
 	// Load up the translation gear
 }
 
+/**
+ * Add actions and filters for when we're in the WordPress backend
+ *
+ * @author Simon Wheatley, earnjam
+ * @version 2.0.0
+ */
 function ep_admin_init() {
 	// Add panels into the editing sidebar(s)
 //	global $wp_version;
@@ -418,7 +480,7 @@ function ep_admin_init() {
 	load_plugin_textdomain( EP_TD, false, dirname( plugin_basename( __FILE__ ) ) . '/locale/' );
 
 	// Call this function on our very own hec_show_dbx filter
-	// This filter is harmless to add, even if we don't have the 
+	// This filter is harmless to add, even if we don't have the
 	// Hide Editor Clutter plugin installed as it's using a custom filter
 	// which won't be called except by the HEC plugin.
 	// Uncomment to show the control by default
@@ -428,12 +490,11 @@ function ep_admin_init() {
 /**
  * Upgrade the plugin options if needed
  *
- * @author Juliette Reinders Folmer
- * @author earnjam
+ * @author Juliette Reinders Folmer, earnjam
  * @since 2.0.0
  */
 function ep_upgrade_options() {
-	
+
 	// New installation of the plugin, option upgrade not needed, just add version number
 	if( get_option( EP_OPTION_NAME ) === false ) {
 		update_option( EP_VERSION_OPTION_NAME, EP_VERSION );
@@ -467,7 +528,6 @@ function ep_upgrade_options() {
 	/* Update the options */
 	update_option( EP_OPTION_NAME, $excluded_ids_str );
 	update_option( EP_VERSION_OPTION_NAME, EP_VERSION );
-
 	return;
 }
 
@@ -493,6 +553,9 @@ add_action( 'admin_init', 'ep_admin_init' );
  *
  * @author Juliette Reinders Folmer
  * @since 2.0.0
+ *
+ * @param	array	$columns	Current columns in overview table
+ * @return	array
  */
 function ep_custom_pages_columns( $columns ) {
 
@@ -510,6 +573,10 @@ function ep_custom_pages_columns( $columns ) {
  *
  * @author Juliette Reinders Folmer
  * @since 2.0.0
+ *
+ * @param	string	$column 	Current column
+ * @param	int 	$post_id	Current post id
+ * @return	void
  */
 function ep_fill_custom_column( $column, $post_id ) {
 	static $excluded_ids;
@@ -552,10 +619,14 @@ function ep_fill_custom_column( $column, $post_id ) {
 
 
 /**
- * Print out the quick edit tickbox
+ * Print out the quick edit tick-box
  *
  * @author Juliette Reinders Folmer
  * @since 2.0.0
+ *
+ * @param	string	$column_name
+ * @param	string	$post_type
+ * @return	void
  */
 function ep_display_custom_quickedit_inmenu( $column_name, $post_type ) {
 	echo '
