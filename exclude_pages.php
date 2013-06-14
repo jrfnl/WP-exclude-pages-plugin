@@ -175,7 +175,15 @@ function ep_get_excluded_ids() {
 // don't want to have to retrieve meta for every page in order to
 // determine if it's to be excluded. Storing all the exclusions in
 // one row seems more sensible.
-function ep_update_exclusions( $post_ID ) {
+function ep_update_exclusions( $post_ID, $post ) {
+
+	// Bail on auto-save
+	if( defined( 'DOING_AUTOSAVE' ) && DOING_AUTOSAVE ) return;
+    // If our current user can't edit this post, bail  
+    if( !current_user_can( 'edit_post' ) ) return; 
+	// Don't save the IDs of revisions. This keeps the excluded pages array smaller.
+	if ($post->post_type == 'revision') return;
+
 	// Bang (!) to reverse the polarity of the boolean, turning include into exclude
 	$exclude_this_page = ! (bool) @ $_POST['ep_this_page_included'];
 	// SWTODO: Also check for a hidden var, which confirms that this checkbox was present
@@ -363,7 +371,7 @@ function ep_admin_init() {
 		add_meta_box('ep_admin_meta_box', __( 'Exclude Pages', EP_TD ), 'ep_admin_sidebar_wp25', $type, 'side', 'low');
 	}
 	// Set the exclusion when the post is saved
-	add_action('save_post', 'ep_update_exclusions');
+	add_action('save_post', 'ep_update_exclusions', 10, 2);
 
 	// Add the JS & CSS to the admin header
 	add_action('admin_head-edit.php', 'ep_admin_css');
