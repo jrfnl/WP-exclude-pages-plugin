@@ -13,6 +13,11 @@ function quickEditInMenu() {
         if (typeof(id) == 'object') {
             id = this.getId(id);
         }
+/*var string = '';
+string += show_props( id, 'id' );
+alert( string );
+alert( '#edit-' + id );*/
+//alert( this.type );
         if (this.type == 'page') {
             var
             // editRow is the quick-edit row, containing the inputs that need to be updated
@@ -21,9 +26,24 @@ function quickEditInMenu() {
             postRow = $('#post-'+id),
 
             // get the existing values
+            // the class ".column-book_author" is set in display_custom_quickedit_book
+//            author = $('.column-book_author', postRow).text(),
             inmenu = !! $('.column-inmenu>input', postRow).attr('checked');
 
+
+/*var string = '';
+string += show_props( editRow[0], 'editRow' );
+alert( string );
+var string = '';
+string += show_props( postRow[0], 'postRow' );
+alert( string );
+var string = '';
+string += show_props( inmenu, 'inmenu' );
+alert( string );
+*/
+
             // set the values in the quick-editor
+//            $(':input[name="book_author"]', editRow).val(author);
             $(':input[name="ep_this_page_included"]', editRow).attr('checked', inmenu);
         }
     };
@@ -33,4 +53,12 @@ if (inlineEditPost) {
     quickEditInMenu();
 } else {
     jQuery(quickEditInMenu);
+}
+
+function show_props(obj, objName) {
+   var result = ""
+   for (var i in obj) {
+      result += objName + "." + i + " = " + obj[i] + "\n"
+   }
+   return result
 }

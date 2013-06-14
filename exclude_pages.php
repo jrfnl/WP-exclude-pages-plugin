@@ -28,6 +28,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 */
 
+/**
+ * @todo: rework to class
+ * @todo: do capabilities check on update
+ * @todo: change ctrl-check to proper nonce-check
+ */
 
 // Full filesystem path to this dir
 define('EP_PLUGIN_DIR', dirname(__FILE__));
@@ -358,6 +363,13 @@ function ep_init() {
 	// the admin side must use another function to get the pages. So we're safe to
 	// remove these pages every time.)
 	add_filter('get_pages','ep_exclude_pages');
+	// Load up the translation gear
+/*	$locale = get_locale();
+	$folder = rtrim( basename( dirname( __FILE__ ) ), '/' );
+	$mo_file = trailingslashit( WP_PLUGIN_DIR ) . "$folder/locale/" . EP_TD . "-$locale.mo";
+	load_textdomain( EP_TD, $mo_file );
+*/
+
 }
 
 function ep_admin_init() {
@@ -369,6 +381,8 @@ function ep_admin_init() {
 	add_action('save_post', 'ep_update_exclusions');
 
 	// Add the JS & CSS to the admin header
+//	add_action('admin_head', 'ep_admin_css');
+//	add_action('admin_footer', 'ep_admin_js');
 	add_action('admin_head-edit.php', 'ep_admin_css');
 	add_action('admin_footer-edit.php', 'ep_admin_js');
 	add_action('admin_footer-edit.php', 'ep_admin_quickedit_js');
@@ -459,7 +473,6 @@ function ep_fill_custom_column( $column, $post_id ) {
 
 			break;
 	}
-
 }
 
 
@@ -470,6 +483,12 @@ function ep_fill_custom_column( $column, $post_id ) {
  * @since 2.0
  */
 function ep_display_custom_quickedit_inmenu( $column_name, $post_type ) {
+/*	static $printNonce = TRUE;
+	if ( $printNonce ) {
+		$printNonce = FALSE;
+		wp_nonce_field( plugin_basename( __FILE__ ), 'inmenu_edit_nonce' );
+	}
+*/
 	echo '
 	<fieldset class="inline-edit-col-left inline-edit-inmenu">
 		<div class="inline-edit-col inline-edit-' . esc_attr( $column_name ) . '">';
