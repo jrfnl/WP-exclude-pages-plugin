@@ -41,7 +41,7 @@ There's only a few phrases to translate, so please send in your translations.
 2. WP 2.5 - Showing the control and warning for a page which is the child of an excluded page
 3. Pre WP 2.5 - Showing the control on the editing screen to exclude a page from the navigation
 4. Pre WP 2.5 - Showing the control and warning for a page which is the child of an excluded page
-5. New features in v2.0 - Showing the all pages view with a new column showing the excluded page status and a tickbox in the quick edit box
+5. New features in v2.0 - Showing the all pages view with a new column showing the excluded page status and a tick-box in the quick edit box
 
 
 == Advanced Usage ==
@@ -60,7 +60,7 @@ The plugin does not operate on wp_list_pages while the user is on an admin page,
 
 = Another note: =
 
-If your plugins or themes don't use the standard WordPress functions to create their menus then they won't work. To get them to work you will need to track down the bit of code in the theme/plugin which gets the pages and change it to apply the filter "get_pages" (I cannot be responsible for any unforseen effects of the changes you make, so please test thoroughly). The change to getting pages will probably look something like this:
+If your plugins or themes don't use the standard WordPress functions to create their menus then they won't work. To get them to work you will need to track down the bit of code in the theme/plugin which gets the pages and change it to apply the filter "get_pages" (I cannot be responsible for any unforeseen effects of the changes you make, so please test thoroughly). The change to getting pages will probably look something like this:
 
 `$pages = apply_filters( 'get_pages', $pages );`
 
