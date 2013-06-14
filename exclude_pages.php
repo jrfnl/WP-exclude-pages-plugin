@@ -363,8 +363,11 @@ function ep_init() {
 function ep_admin_init() {
 	// Add panels into the editing sidebar(s)
 	global $wp_version;
-	add_meta_box('ep_admin_meta_box', __( 'Exclude Pages', EP_TD ), 'ep_admin_sidebar_wp25', 'page', 'side', 'low');
-
+	// Add the meta box to every hierarchical post type.
+	$types = get_post_types( array ( 'hierarchical' => true ), 'names');
+	foreach ($types as $type) {
+		add_meta_box('ep_admin_meta_box', __( 'Exclude Pages', EP_TD ), 'ep_admin_sidebar_wp25', $type, 'side', 'low');
+	}
 	// Set the exclusion when the post is saved
 	add_action('save_post', 'ep_update_exclusions');
 
