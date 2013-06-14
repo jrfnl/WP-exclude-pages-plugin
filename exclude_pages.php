@@ -444,7 +444,6 @@ function ep_init() {
 	// the admin side must use another function to get the pages. So we're safe to
 	// remove these pages every time.)
 	add_filter('get_pages','ep_exclude_pages');
-	// Load up the translation gear
 }
 
 /**
