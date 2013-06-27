@@ -233,8 +233,6 @@ function ep_update_exclusions( $post_ID, $post ) {
 
 	// Bail on auto-save
 	if( defined( 'DOING_AUTOSAVE' ) && DOING_AUTOSAVE ) return;
-	// If our current user can't edit this post, bail
-	if( !current_user_can( 'edit_post' ) ) return;
 	// Don't save the IDs of revisions. This keeps the excluded pages array smaller.
 	if ($post->post_type == 'revision') return;
 
