@@ -509,12 +509,16 @@ function ep_upgrade_options() {
 	/* Settings upgrade for version 2.0.0 */
 	if( get_option( EP_VERSION_OPTION_NAME ) === false || version_compare( get_option( EP_VERSION_OPTION_NAME ), '2.0.beta.2', '<' ) ) {
 
-		/* Remove revision post ids from the array*/
-		// @todo
-		// For each post id check whether this is the main id or a revision id
-		// If revision id, verify that the id of the original page is included in the exclude array
-			// If needed, add the id of the real page
-			// Remove revision id
+		foreach ( $excluded_ids as $id ) {
+
+			// Check for revisions
+			if ( get_post_type( $id ) !== 'revision' ) 
+				$proper_ids[] = $id;
+
+		}
+
+		// Update our excluded IDs list with the new list sans revisions
+		$excluded_ids = $proper_ids;
 
 	}
 
