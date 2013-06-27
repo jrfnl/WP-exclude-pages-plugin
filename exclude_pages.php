@@ -8,8 +8,8 @@ Author: Simon Wheatley
 Author URI: http://simonwheatley.co.uk/wordpress/
 Contributor: Juliette Reinders Folmer
 Contributor URI: http://adviesenzo.nl/
-Contributor: Earnjam
-Contributor URI:
+Contributor: Will Earnhardt
+Contributor URI: http://twitter.com/earnjam
 Text Domain: exclude-pages
 Domain Path: /locale/
 
