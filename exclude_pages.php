@@ -234,7 +234,7 @@ function ep_update_exclusions( $post_ID, $post ) {
 	// Bail on auto-save
 	if( defined( 'DOING_AUTOSAVE' ) && DOING_AUTOSAVE ) return;
 	// If our current user can't edit this post, bail
-	if( !current_user_can( 'edit_page' ) ) return;
+	if( !current_user_can( 'edit_post' ) ) return;
 	// Don't save the IDs of revisions. This keeps the excluded pages array smaller.
 	if ($post->post_type == 'revision') return;
 
@@ -399,13 +399,11 @@ END;
  * @return void
  */
 function ep_admin_quickedit_js() {
-	$types = get_post_types( array ( 'hierarchical' => true ), 'objects');
-	$user = wp_get_current_user();
+	$types = get_post_types( array ( 'hierarchical' => true ), 'names');
 	$suffix = ( ( defined( 'SCRIPT_DEBUG' ) && SCRIPT_DEBUG === true ) ? '' : '.min' );
-
 	# load only when editing a hierarchical post type
-	if( ( ( isset( $_GET['page'] ) && array_key_exists( $_GET['page'], $types ) ) && ( isset( $user->roles ) && in_array( $types[$_GET['page']]->cap->edit_post, (array) $user->roles ) ) )
-		|| ( ( isset( $_GET['post_type'] ) && array_key_exists( $_GET['post_type'], $types ) ) && ( isset( $user->roles ) && in_array( $types[$_GET['post_type']]->cap->edit_post, (array) $user->roles ) ) ) ) {
+	if( ( isset( $_GET['page'] ) && in_array( $_GET['page'], $types ) )
+		|| ( isset( $_GET['post_type'] ) && in_array( $_GET['post_type'], $types ) ) ) {
 		echo '<script type="text/javascript" src="' . plugins_url( 'admin_quickedit'.$suffix.'.js', __FILE__ ) . '"></script>';
 	}
 }
@@ -458,12 +456,9 @@ function ep_admin_init() {
 	// Add panels into the editing sidebar(s)
 //	global $wp_version;
 	// Add the meta box to every hierarchical post type.
-	$types = get_post_types( array ( 'hierarchical' => true ), 'objects');
-	$user = wp_get_current_user();
-	foreach ($types as $post_type_object) {
-		if( isset( $user->roles ) && in_array( $post_type_object->cap->edit_post, (array) $user->roles ) ) {
-			add_meta_box('ep_admin_meta_box', __( 'Exclude Pages', EP_TD ), 'ep_admin_sidebar_wp25', $post_type_object->name, 'side', 'low');
-		}
+	$types = get_post_types( array ( 'hierarchical' => true ), 'names');
+	foreach ($types as $type) {
+		add_meta_box('ep_admin_meta_box', __( 'Exclude Pages', EP_TD ), 'ep_admin_sidebar_wp25', $type, 'side', 'low');
 	}
 	// Set the exclusion when the post is saved
 	add_action('save_post', 'ep_update_exclusions', 10, 2);
@@ -490,8 +485,6 @@ function ep_admin_init() {
 	// Uncomment to show the control by default
 	// add_filter('hec_show_dbx','ep_hec_show_dbx');
 }
-
-
 
 /**
  * Upgrade the plugin options if needed

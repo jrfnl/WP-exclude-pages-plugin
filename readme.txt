@@ -82,11 +82,11 @@ I'm simply noting requests & bug reports here, I've not necessarily looked into 
 
 == Changelog ==
 
-= v2.0beta2 2013/06/28 by [earnjam](http://twitter.com/earnjam) and [Jrf, Advies en zo](http://adviesenzo.nl/) =
+= v2.0beta2 2013/06/14 by [earnjam]() and [Jrf, Advies en zo](http://adviesenzo.nl/) =
 * ENHANCEMENT: Added support for all hierarchical post types - Displays exclude meta box on any hierarchical post type
 * BUGFIX: Patch for bug where exclude status doesn't save
 * FIX: Improvements to ep_update_exclusions() - Added code to prevent saving on auto-save, a check to be sure the, person updating the value has the rights to do so, and a check to prevent saving the post revision IDs to the excluded pages array.
-* ENHANCEMENT: Added upgrade routine which will remove revision IDs from the option array. This will cut the size of the excluded pages array by at least 50%. PLEASE NOTE: in rare cases this may make a previously excluded page visible again, so please do carefully check your exclusions after upgrading!
+* ENHANCEMENT: Added upgrade routine which will remove revision IDs from the option array. This will cut the size of the excluded pages array by at least 50%.
 * ENHANCEMENT: added minified js file which respects SCRIPT_DEBUG setting
 
 = v2.0beta 2013/03/08 by [Jrf, Advies en zo](http://adviesenzo.nl/) =
@@ -187,7 +187,6 @@ Simon
 
 = 2.0beta2 =
 New feature: now works with all hierarchical post types + some bug fixes and other enhancements
-PLEASE NOTE: in rare cases this upgrade may make a previously excluded page visible again, so please check your exclusions after upgrading!
 
 = 2.0beta =
 New features: you can now use exclude pages from the quick edit box
