@@ -487,7 +487,7 @@ function ep_admin_init() {
 /**
  * Upgrade the plugin options if needed
  *
- * @author Juliette Reinders Folmer, earnjam
+ * @author Juliette Reinders Folmer, Will Earnhardt
  * @since 2.0.0
  */
 function ep_upgrade_options() {
@@ -509,17 +509,21 @@ function ep_upgrade_options() {
 	/* Settings upgrade for version 2.0.0 */
 	if( get_option( EP_VERSION_OPTION_NAME ) === false || version_compare( get_option( EP_VERSION_OPTION_NAME ), '2.0.beta.2', '<' ) ) {
 
+        if( is_array( $excluded_ids ) && count( $excluded_ids ) > 0 ) {
+
+            $proper_ids = array();
+
 		foreach ( $excluded_ids as $id ) {
 
 			// Check for revisions
-			if ( get_post_type( $id ) !== 'revision' ) 
+                if ( get_post_type( $id ) !== 'revision' ) {
 				$proper_ids[] = $id;
-
+                }
 		}
 
 		// Update our excluded IDs list with the new list sans revisions
 		$excluded_ids = $proper_ids;
-
+        }
 	}
 
 	/* De-dupe the array, just in case and implode to string */
