@@ -13,7 +13,7 @@ Contributor URI: http://twitter.com/earnjam
 Text Domain: exclude-pages
 Domain Path: /locale/
 
-Copyright 2007-2013 Simon Wheatley, Juliette Reinders Folmer
+Copyright 2007-2013 Simon Wheatley, Juliette Reinders Folmer, Will Earnhardt
 
 This script is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -111,7 +111,7 @@ function ep_exclude_pages( $pages ) {
  *
  * @author Simon Wheatley
  *
- * @param int	$page
+ * @param object $page
  * @param array $excluded_ids
  * @param array $pages
  * @return boolean|int The ID of the "nearest" excluded ancestor, otherwise false
@@ -182,7 +182,7 @@ function ep_this_page_included() {
  * Check the ancestors for the page we're editing (defined by global $post_ID var),
  * return the ID of the nearest one which is excluded (if any);
  *
- * @author Simon Wheatley
+ * @author Simon Wheatley, Juliette Reinders Folmer
  *
  * @return bool|int
  */
@@ -191,8 +191,11 @@ function ep_nearest_excluded_ancestor() {
 	// New post? No problem.
 	if ( ! $post_ID ) return false;
 	$excluded_ids = ep_get_excluded_ids();
+	// Get all the pages/custom post type posts and avoid our own filter.
+	$post_type = get_post_type( $post_ID );
+	if( $post_type === false ) { $post_type = 'page'; }
 	// Manually get all the pages, to avoid our own filter.
-	$sql = "SELECT ID, post_parent FROM $wpdb->posts WHERE post_type = 'page'";
+	$sql = $wpdb->prepare( "SELECT ID, post_parent FROM $wpdb->posts WHERE post_type = %s", $post_type );
 	$pages = $wpdb->get_results( $sql );
 	// Start recursively checking the ancestors
 	$parent = ep_get_page( $post_ID, $pages );
@@ -476,15 +479,30 @@ function ep_init() {
 function ep_admin_init() {
 	// Add panels into the editing sidebar(s)
 //	global $wp_version;
-	// Add the meta box to every hierarchical post type.
+	// Add the meta box and quick edit box to every hierarchical post type.
 	$types = get_post_types( array ( 'hierarchical' => true ), 'objects');
 	$user = wp_get_current_user();
 	foreach ($types as $post_type_object) {
 		if( ( isset( $user->allcaps[$post_type_object->cap->edit_post] ) && $user->allcaps[$post_type_object->cap->edit_post] === true ) || ( isset( $user->allcaps[$post_type_object->cap->edit_posts] ) && $user->allcaps[$post_type_object->cap->edit_posts] === true ) ) {
 			// Add meta box
 			add_meta_box('ep_admin_meta_box', __( 'Exclude Pages', EP_TD ), 'ep_admin_sidebar_wp25', $post_type_object->name, 'side', 'low');
+
+			// Add relevant actions and filters for quick edit box
+			if( $post_type_object->name === 'page' ) {
+				add_filter( 'manage_pages_columns', 'ep_custom_pages_columns' );
+				add_action( 'manage_pages_custom_column', 'ep_fill_custom_column', 10, 2 );
+		}
+			else {
+				add_filter( 'manage_edit-' . $post_type_object->name . '_columns', 'ep_custom_pages_columns' );
+				// I haven't got a clue why this is not needed for the custom post types, but if I uncomment it, the column gets filled twice....
+//				add_action( 'manage_' . $post_type_object->name . '_posts_custom_column', 'ep_fill_custom_column', 10, 2 );
+			}
 		}
 	}
+	
+	// Add action to add edit code for quick edit box
+	add_action( 'quick_edit_custom_box', 'ep_display_custom_quickedit_inmenu', 10, 2 );
+
 	// Set the exclusion when the post is saved
 	add_action('save_post', 'ep_update_exclusions', 10, 2);
 
@@ -495,11 +513,6 @@ function ep_admin_init() {
 
 	add_action('admin_head-post.php', 'ep_admin_css');
 	add_action('admin_footer-post.php', 'ep_admin_js');
-
-	add_action( 'quick_edit_custom_box', 'ep_display_custom_quickedit_inmenu', 10, 2 );
-
-	add_filter( 'manage_pages_columns', 'ep_custom_pages_columns' );
-	add_action( 'manage_pages_custom_column', 'ep_fill_custom_column', 10, 2 );
 
 	load_plugin_textdomain( EP_TD, false, dirname( plugin_basename( __FILE__ ) ) . '/locale/' );
 
@@ -536,21 +549,20 @@ function ep_upgrade_options() {
 	/* Settings upgrade for version 2.0.0 */
 	if( get_option( EP_VERSION_OPTION_NAME ) === false || version_compare( get_option( EP_VERSION_OPTION_NAME ), '2.0.beta.2', '<' ) ) {
 
-        if( is_array( $excluded_ids ) && count( $excluded_ids ) > 0 ) {
+		if( is_array( $excluded_ids ) && count( $excluded_ids ) > 0 ) {
 
-            $proper_ids = array();
+			$proper_ids = array();
 
-		foreach ( $excluded_ids as $id ) {
-
+			foreach ( $excluded_ids as $id ) {
 			// Check for revisions
-                if ( get_post_type( $id ) !== 'revision' ) {
+				if ( get_post_type( $id ) !== 'revision' ) {
 				$proper_ids[] = $id;
-                }
-		}
+				}
+			}
 
-		// Update our excluded IDs list with the new list sans revisions
-		$excluded_ids = $proper_ids;
-        }
+			// Update our excluded IDs list with the new list sans revisions
+			$excluded_ids = $proper_ids;
+		}
 	}
 
 	/* De-dupe the array, just in case and implode to string */
@@ -611,14 +623,21 @@ function ep_custom_pages_columns( $columns ) {
  * @return	void
  */
 function ep_fill_custom_column( $column, $post_id ) {
+	global $wpdb;
+
 	static $excluded_ids;
 	static $pages;
 
 	if( is_null( $excluded_ids ) )
 		$excluded_ids = ep_get_excluded_ids();
 
-	if( is_null( $pages ) )
-		$pages = get_pages();
+	// Fill pages array while avoiding our own filters
+	$post_type = get_post_type( $post_id );
+	if( is_null( $pages ) ) {
+		// Manually get all the pages, to avoid our own filter.
+		$sql = $wpdb->prepare( "SELECT ID, post_parent FROM $wpdb->posts WHERE post_type = %s", $post_type );
+		$pages = $wpdb->get_results( $sql );
+	}
 
 	switch ( $column ) {
 
@@ -636,8 +655,8 @@ function ep_fill_custom_column( $column, $post_id ) {
 				$checked = false;
 			}
 
-			$page = get_page( $post_id );
-			$ancestor_inmenu = ep_ancestor_excluded( $page, $excluded_ids, $pages );
+			$parent = ep_get_page( $post_id, $pages );
+			$ancestor_inmenu = ep_ancestor_excluded( $parent, $excluded_ids, $pages );
 
 			echo '<img src="' . esc_url( $imgsrc ) . '" width="16" height="16" alt="' . esc_attr( $imgalt ) .
 				'"'. ( ( $ancestor_inmenu !== false ) ? ' class="ep_parent_excluded"' : '' ) . ' />
