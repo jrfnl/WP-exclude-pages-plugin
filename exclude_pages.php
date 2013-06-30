@@ -222,19 +222,38 @@ function ep_get_excluded_ids() {
  * determine if it's to be excluded. Storing all the exclusions in
  * one row seems more sensible.
  *
- * @author Simon Wheatley, earnjam
+ * @author Simon Wheatley, Will Earnhardt, Juliette Reinders Folmer
  * @version 2.0.0
+ *
+ * @todo further testing of permission checking for various roles, now only been tested as admin (which is definitely not enough)
+ * @todo and while you're at it.... testing with various WP and PHP versions needed to determine current minimum WP
+ * version
  *
  * @param int $post_ID The ID of the WP page to exclude
  * @param object $post The post object
  * @return void
  */
 function ep_update_exclusions( $post_ID, $post ) {
-
 	// Bail on auto-save
-	if( defined( 'DOING_AUTOSAVE' ) && DOING_AUTOSAVE ) return;
-	// Don't save the IDs of revisions. This keeps the excluded pages array smaller.
-	if ($post->post_type == 'revision') return;
+	if( defined( 'DOING_AUTOSAVE' ) && DOING_AUTOSAVE )
+		return;
+
+	// Bail on initial concept save
+	if( ( $post->post_status === 'auto-draft' && $post->post_title === __( 'Auto Draft' ) ) && ( $post->post_name === '' && $post->post_content === '' ) )
+		return;
+
+
+	// Make sure the ID of the post is added to our exclusion array, not the ID of a revision.
+	// This keeps the excluded pages array smaller.
+	if ( $the_post = wp_is_post_revision( $post_ID ) )
+		$post_ID = $the_post;
+
+
+	// If our current user can't edit this page/custom post type, bail
+	$post_type_object = get_post_type_object( $post->post_type );
+	if ( !current_user_can( $post_type_object->cap->edit_post, $post_ID ) )
+		return;
+
 
 	// Bang (!) to reverse the polarity of the boolean, turning include into exclude
 	$exclude_this_page = ! (bool) @ $_POST['ep_this_page_included'];
@@ -397,11 +416,15 @@ END;
  * @return void
  */
 function ep_admin_quickedit_js() {
-	$types = get_post_types( array ( 'hierarchical' => true ), 'names');
+	$types = get_post_types( array ( 'hierarchical' => true ), 'objects');
+	$user = wp_get_current_user();
 	$suffix = ( ( defined( 'SCRIPT_DEBUG' ) && SCRIPT_DEBUG === true ) ? '' : '.min' );
 	# load only when editing a hierarchical post type
-	if( ( isset( $_GET['page'] ) && in_array( $_GET['page'], $types ) )
-		|| ( isset( $_GET['post_type'] ) && in_array( $_GET['post_type'], $types ) ) ) {
+	if( ( ( isset( $_GET['page'] ) && array_key_exists( $_GET['page'], $types ) ) &&
+		( ( isset( $user->allcaps[$types[$_GET['page']]->cap->edit_post] ) && $user->allcaps[$types[$_GET['page']]->cap->edit_post] === true ) || ( isset( $user->allcaps[$types[$_GET['page']]->cap->edit_posts] ) && $user->allcaps[$types[$_GET['page']]->cap->edit_posts] === true ) ) )
+		||
+		( ( isset( $_GET['post_type'] ) && array_key_exists( $_GET['post_type'], $types ) ) &&
+		( ( isset( $user->allcaps[$types[$_GET['post_type']]->cap->edit_post] ) && $user->allcaps[$types[$_GET['post_type']]->cap->edit_post] === true ) || ( isset( $user->allcaps[$types[$_GET['post_type']]->cap->edit_posts] ) && $user->allcaps[$types[$_GET['post_type']]->cap->edit_posts] === true ) ) ) ) {
 		echo '<script type="text/javascript" src="' . plugins_url( 'admin_quickedit'.$suffix.'.js', __FILE__ ) . '"></script>';
 	}
 }
@@ -447,16 +470,20 @@ function ep_init() {
 /**
  * Add actions and filters for when we're in the WordPress backend
  *
- * @author Simon Wheatley, earnjam
+ * @author Simon Wheatley, Juliette Reinders Folmer, Will Earnhardt
  * @version 2.0.0
  */
 function ep_admin_init() {
 	// Add panels into the editing sidebar(s)
 //	global $wp_version;
 	// Add the meta box to every hierarchical post type.
-	$types = get_post_types( array ( 'hierarchical' => true ), 'names');
-	foreach ($types as $type) {
-		add_meta_box('ep_admin_meta_box', __( 'Exclude Pages', EP_TD ), 'ep_admin_sidebar_wp25', $type, 'side', 'low');
+	$types = get_post_types( array ( 'hierarchical' => true ), 'objects');
+	$user = wp_get_current_user();
+	foreach ($types as $post_type_object) {
+		if( ( isset( $user->allcaps[$post_type_object->cap->edit_post] ) && $user->allcaps[$post_type_object->cap->edit_post] === true ) || ( isset( $user->allcaps[$post_type_object->cap->edit_posts] ) && $user->allcaps[$post_type_object->cap->edit_posts] === true ) ) {
+			// Add meta box
+			add_meta_box('ep_admin_meta_box', __( 'Exclude Pages', EP_TD ), 'ep_admin_sidebar_wp25', $post_type_object->name, 'side', 'low');
+		}
 	}
 	// Set the exclusion when the post is saved
 	add_action('save_post', 'ep_update_exclusions', 10, 2);
