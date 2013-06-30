@@ -2,6 +2,7 @@
 Thumbs.db
 *.log
 *.bak
+*.orig
 .idea/
 backup/
 backups/
