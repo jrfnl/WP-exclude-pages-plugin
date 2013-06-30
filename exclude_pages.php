@@ -229,8 +229,7 @@ function ep_get_excluded_ids() {
  * @version 2.0.0
  *
  * @todo further testing of permission checking for various roles, now only been tested as admin (which is definitely not enough)
- * @todo and while you're at it.... testing with various WP and PHP versions needed to determine current minimum WP
- * version
+ * @todo and while you're at it.... testing with various WP and PHP versions needed to determine current minimum WP version
  *
  * @param int $post_ID The ID of the WP page to exclude
  * @param object $post The post object
@@ -422,6 +421,7 @@ function ep_admin_quickedit_js() {
 	$types = get_post_types( array ( 'hierarchical' => true ), 'objects');
 	$user = wp_get_current_user();
 	$suffix = ( ( defined( 'SCRIPT_DEBUG' ) && SCRIPT_DEBUG === true ) ? '' : '.min' );
+
 	# load only when editing a hierarchical post type
 	if( ( ( isset( $_GET['page'] ) && array_key_exists( $_GET['page'], $types ) ) &&
 		( ( isset( $user->allcaps[$types[$_GET['page']]->cap->edit_post] ) && $user->allcaps[$types[$_GET['page']]->cap->edit_post] === true ) || ( isset( $user->allcaps[$types[$_GET['page']]->cap->edit_posts] ) && $user->allcaps[$types[$_GET['page']]->cap->edit_posts] === true ) ) )
@@ -491,7 +491,7 @@ function ep_admin_init() {
 			if( $post_type_object->name === 'page' ) {
 				add_filter( 'manage_pages_columns', 'ep_custom_pages_columns' );
 				add_action( 'manage_pages_custom_column', 'ep_fill_custom_column', 10, 2 );
-		}
+			}
 			else {
 				add_filter( 'manage_edit-' . $post_type_object->name . '_columns', 'ep_custom_pages_columns' );
 				// I haven't got a clue why this is not needed for the custom post types, but if I uncomment it, the column gets filled twice....
@@ -523,6 +523,8 @@ function ep_admin_init() {
 	// Uncomment to show the control by default
 	// add_filter('hec_show_dbx','ep_hec_show_dbx');
 }
+
+
 
 /**
  * Upgrade the plugin options if needed
