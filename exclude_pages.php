@@ -8,8 +8,8 @@ Author: Simon Wheatley
 Author URI: http://simonwheatley.co.uk/wordpress/
 Contributor: Juliette Reinders Folmer
 Contributor URI: http://adviesenzo.nl/
-Contributor: Earnjam
-Contributor URI:
+Contributor: Will Earnhardt
+Contributor URI: http://twitter.com/earnjam
 Text Domain: exclude-pages
 Domain Path: /locale/
 
@@ -111,7 +111,7 @@ function ep_exclude_pages( $pages ) {
  *
  * @author Simon Wheatley
  *
- * @param int	$page
+ * @param object $page
  * @param array $excluded_ids
  * @param array $pages
  * @return boolean|int The ID of the "nearest" excluded ancestor, otherwise false
@@ -182,18 +182,21 @@ function ep_this_page_included() {
  * Check the ancestors for the page we're editing (defined by global $post_ID var),
  * return the ID of the nearest one which is excluded (if any);
  *
- * @author Simon Wheatley
+ * @author Simon Wheatley, Juliette Reinders Folmer
  *
  * @return bool|int
  */
 function ep_nearest_excluded_ancestor() {
-	global $post_ID, $wpdb;
+	global $post_ID;
 	// New post? No problem.
 	if ( ! $post_ID ) return false;
 	$excluded_ids = ep_get_excluded_ids();
-	// Manually get all the pages, to avoid our own filter.
-	$sql = "SELECT ID, post_parent FROM $wpdb->posts WHERE post_type = 'page'";
-	$pages = $wpdb->get_results( $sql );
+	// Get all the pages/custom post type posts and avoid our own filter.
+	$post_type = get_post_type( $post_ID );
+	if( $post_type === false ) { $post_type = 'page'; }
+	pause_exclude_pages();
+	$pages = get_pages( array( 'post_type' => $post_type ) );
+	resume_exclude_pages();
 	// Start recursively checking the ancestors
 	$parent = ep_get_page( $post_ID, $pages );
 	return ep_ancestor_excluded( $parent, $excluded_ids, $pages );
@@ -222,21 +225,38 @@ function ep_get_excluded_ids() {
  * determine if it's to be excluded. Storing all the exclusions in
  * one row seems more sensible.
  *
- * @author Simon Wheatley, earnjam
+ * @author Simon Wheatley, Will Earnhardt, Juliette Reinders Folmer
  * @version 2.0.0
+ *
+ * @todo further testing of permission checking for various roles, now only been tested as admin (which is definitely not enough)
+ * @todo and while you're at it.... testing with various WP and PHP versions needed to determine current minimum WP
+ * version
  *
  * @param int $post_ID The ID of the WP page to exclude
  * @param object $post The post object
  * @return void
  */
 function ep_update_exclusions( $post_ID, $post ) {
-
 	// Bail on auto-save
-	if( defined( 'DOING_AUTOSAVE' ) && DOING_AUTOSAVE ) return;
-	// If our current user can't edit this post, bail
-	if( !current_user_can( 'edit_post' ) ) return;
-	// Don't save the IDs of revisions. This keeps the excluded pages array smaller.
-	if ($post->post_type == 'revision') return;
+	if( defined( 'DOING_AUTOSAVE' ) && DOING_AUTOSAVE )
+		return;
+
+	// Bail on initial concept save
+	if( ( $post->post_status === 'auto-draft' && $post->post_title === __( 'Auto Draft' ) ) && ( $post->post_name === '' && $post->post_content === '' ) )
+		return;
+
+
+	// Make sure the ID of the post is added to our exclusion array, not the ID of a revision.
+	// This keeps the excluded pages array smaller.
+	if ( $the_post = wp_is_post_revision( $post_ID ) )
+		$post_ID = $the_post;
+
+
+	// If our current user can't edit this page/custom post type, bail
+	$post_type_object = get_post_type_object( $post->post_type );
+	if ( !current_user_can( $post_type_object->cap->edit_post, $post_ID ) )
+		return;
+
 
 	// Bang (!) to reverse the polarity of the boolean, turning include into exclude
 	$exclude_this_page = ! (bool) @ $_POST['ep_this_page_included'];
@@ -399,11 +419,16 @@ END;
  * @return void
  */
 function ep_admin_quickedit_js() {
-	$types = get_post_types( array ( 'hierarchical' => true ), 'names');
+	$types = get_post_types( array ( 'hierarchical' => true ), 'objects');
+	$user = wp_get_current_user();
 	$suffix = ( ( defined( 'SCRIPT_DEBUG' ) && SCRIPT_DEBUG === true ) ? '' : '.min' );
+
 	# load only when editing a hierarchical post type
-	if( ( isset( $_GET['page'] ) && in_array( $_GET['page'], $types ) )
-		|| ( isset( $_GET['post_type'] ) && in_array( $_GET['post_type'], $types ) ) ) {
+	if( ( ( isset( $_GET['page'] ) && array_key_exists( $_GET['page'], $types ) ) &&
+		( ( isset( $user->allcaps[$types[$_GET['page']]->cap->edit_post] ) && $user->allcaps[$types[$_GET['page']]->cap->edit_post] === true ) || ( isset( $user->allcaps[$types[$_GET['page']]->cap->edit_posts] ) && $user->allcaps[$types[$_GET['page']]->cap->edit_posts] === true ) ) )
+		||
+		( ( isset( $_GET['post_type'] ) && array_key_exists( $_GET['post_type'], $types ) ) &&
+		( ( isset( $user->allcaps[$types[$_GET['post_type']]->cap->edit_post] ) && $user->allcaps[$types[$_GET['post_type']]->cap->edit_post] === true ) || ( isset( $user->allcaps[$types[$_GET['post_type']]->cap->edit_posts] ) && $user->allcaps[$types[$_GET['post_type']]->cap->edit_posts] === true ) ) ) ) {
 		echo '<script type="text/javascript" src="' . plugins_url( 'admin_quickedit'.$suffix.'.js', __FILE__ ) . '"></script>';
 	}
 }
@@ -449,16 +474,34 @@ function ep_init() {
 /**
  * Add actions and filters for when we're in the WordPress backend
  *
- * @author Simon Wheatley, earnjam
+ * @author Simon Wheatley, Juliette Reinders Folmer, Will Earnhardt
  * @version 2.0.0
  */
 function ep_admin_init() {
 	// Add panels into the editing sidebar(s)
 //	global $wp_version;
-	// Add the meta box to every hierarchical post type.
-	$types = get_post_types( array ( 'hierarchical' => true ), 'names');
-	foreach ($types as $type) {
-		add_meta_box('ep_admin_meta_box', __( 'Exclude Pages', EP_TD ), 'ep_admin_sidebar_wp25', $type, 'side', 'low');
+
+	// Add the meta box and quick edit box to every hierarchical post type.
+	$types = get_post_types( array ( 'hierarchical' => true ), 'objects');
+	$user = wp_get_current_user();
+	foreach ($types as $post_type_object) {
+		if( ( isset( $user->allcaps[$post_type_object->cap->edit_post] ) && $user->allcaps[$post_type_object->cap->edit_post] === true ) || ( isset( $user->allcaps[$post_type_object->cap->edit_posts] ) && $user->allcaps[$post_type_object->cap->edit_posts] === true ) ) {
+			// Add meta box
+			add_meta_box('ep_admin_meta_box', __( 'Exclude Pages', EP_TD ), 'ep_admin_sidebar_wp25', $post_type_object->name, 'side', 'low');
+
+			// Add relevant actions and filters for quick edit box
+			add_action( 'quick_edit_custom_box', 'ep_display_custom_quickedit_inmenu', 10, 2 );
+
+			if( $post_type_object->name === 'page' ) {
+				add_filter( 'manage_pages_columns', 'ep_custom_pages_columns' );
+				add_action( 'manage_pages_custom_column', 'ep_fill_custom_column', 10, 2 );
+			}
+			else {
+				add_filter( 'manage_edit-' . $post_type_object->name . '_columns', 'ep_custom_pages_columns' );
+				// I haven't got a clue why this is not needed for the custom post types, but if I uncomment it, the column gets filled twice....
+//				add_action( 'manage_' . $post_type_object->name . '_posts_custom_column', 'ep_fill_custom_column', 10, 2 );
+			}
+		}
 	}
 	// Set the exclusion when the post is saved
 	add_action('save_post', 'ep_update_exclusions', 10, 2);
@@ -471,11 +514,6 @@ function ep_admin_init() {
 	add_action('admin_head-post.php', 'ep_admin_css');
 	add_action('admin_footer-post.php', 'ep_admin_js');
 
-	add_action( 'quick_edit_custom_box', 'ep_display_custom_quickedit_inmenu', 10, 2 );
-
-	add_filter( 'manage_pages_columns', 'ep_custom_pages_columns' );
-	add_action( 'manage_pages_custom_column', 'ep_fill_custom_column', 10, 2 );
-
 	load_plugin_textdomain( EP_TD, false, dirname( plugin_basename( __FILE__ ) ) . '/locale/' );
 
 	// Call this function on our very own hec_show_dbx filter
@@ -486,10 +524,12 @@ function ep_admin_init() {
 	// add_filter('hec_show_dbx','ep_hec_show_dbx');
 }
 
+
+
 /**
  * Upgrade the plugin options if needed
  *
- * @author Juliette Reinders Folmer, earnjam
+ * @author Juliette Reinders Folmer, Will Earnhardt
  * @since 2.0.0
  */
 function ep_upgrade_options() {
@@ -511,13 +551,20 @@ function ep_upgrade_options() {
 	/* Settings upgrade for version 2.0.0 */
 	if( get_option( EP_VERSION_OPTION_NAME ) === false || version_compare( get_option( EP_VERSION_OPTION_NAME ), '2.0.beta.2', '<' ) ) {
 
-		/* Remove revision post ids from the array*/
-		// @todo
-		// For each post id check whether this is the main id or a revision id
-		// If revision id, verify that the id of the original page is included in the exclude array
-			// If needed, add the id of the real page
-			// Remove revision id
+        if( is_array( $excluded_ids ) && count( $excluded_ids ) > 0 ) {
 
+            $proper_ids = array();
+
+            foreach ( $excluded_ids as $id ) {
+                // Check for revisions
+                if ( get_post_type( $id ) !== 'revision' ) {
+                    $proper_ids[] = $id;
+                }
+            }
+
+            // Update our excluded IDs list with the new list sans revisions
+            $excluded_ids = $proper_ids;
+        }
 	}
 
 	/* De-dupe the array, just in case and implode to string */
@@ -584,8 +631,13 @@ function ep_fill_custom_column( $column, $post_id ) {
 	if( is_null( $excluded_ids ) )
 		$excluded_ids = ep_get_excluded_ids();
 
-	if( is_null( $pages ) )
-		$pages = get_pages();
+	// Fill pages array while avoiding our own filters
+	$post_type = get_post_type( $post_id );
+	if( is_null( $pages ) ) {
+		pause_exclude_pages();
+		$pages = get_pages( array( 'post_type' => $post_type ) );
+		resume_exclude_pages();
+	}
 
 	switch ( $column ) {
 
@@ -603,8 +655,8 @@ function ep_fill_custom_column( $column, $post_id ) {
 				$checked = false;
 			}
 
-			$page = get_page( $post_id );
-			$ancestor_inmenu = ep_ancestor_excluded( $page, $excluded_ids, $pages );
+			$parent = ep_get_page( $post_id, $pages );
+			$ancestor_inmenu = ep_ancestor_excluded( $parent, $excluded_ids, $pages );
 
 			echo '<img src="' . esc_url( $imgsrc ) . '" width="16" height="16" alt="' . esc_attr( $imgalt ) .
 				'"'. ( ( $ancestor_inmenu !== false ) ? ' class="ep_parent_excluded"' : '' ) . ' />
