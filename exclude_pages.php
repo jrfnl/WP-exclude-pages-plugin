@@ -111,13 +111,18 @@ function ep_exclude_pages( $pages ) {
  *
  * @author Simon Wheatley
  *
+ * @todo rewrite first line to avoid strict warning 'Only variables should be assigned by reference'
+ * - let's just try it first without the reference... not clear what if anything will break...
+ * (which is why this is a beta)
+ *
  * @param object $page
  * @param array $excluded_ids
  * @param array $pages
  * @return boolean|int The ID of the "nearest" excluded ancestor, otherwise false
  */
 function ep_ancestor_excluded( $page, $excluded_ids, $pages ) {
-	$parent = & ep_get_page( $page->post_parent, $pages );
+//	$parent = & ep_get_page( $page->post_parent, $pages );
+	$parent = ep_get_page( $page->post_parent, $pages );
 	// Is there a parent?
 	if ( ! $parent )
 		return false;
@@ -514,7 +519,8 @@ function ep_admin_init() {
 	add_action('admin_head-post.php', 'ep_admin_css');
 	add_action('admin_footer-post.php', 'ep_admin_js');
 
-	load_plugin_textdomain( EP_TD, false, dirname( plugin_basename( __FILE__ ) ) . '/locale/' );
+	$domain = dirname( plugin_basename( __FILE__ ) ) . '/locale/';
+	load_plugin_textdomain( EP_TD, false, $domain );
 
 	// Call this function on our very own hec_show_dbx filter
 	// This filter is harmless to add, even if we don't have the
